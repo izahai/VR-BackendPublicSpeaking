@@ -1,7 +1,8 @@
 ## Setup
 
 For Mac user, ffmpeg and ffprobe are essential make sure you export it in terminal
-`export PATH="<path where ffmpeg and ffprobe are placed>:$PATH"`
+```bash
+export PATH="<path where ffmpeg and ffprobe are placed>:$PATH"
 
 Create virtual env
 >    conda env create -f environment.yml
