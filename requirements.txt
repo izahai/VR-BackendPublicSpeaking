@@ -1,0 +1,3 @@
+sentence-transformers
+openai
+python-dotenv

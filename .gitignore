@@ -1,0 +1,4 @@
+videos/*
+.env
+test_audio/*
+self.txt

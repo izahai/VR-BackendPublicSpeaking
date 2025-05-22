@@ -1,0 +1,14 @@
+name: VrBackend  # You can change this to your desired environment name
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - sentence-transformers
+      - openai
+      - python-dotenv
+      - fastapi
+      - openai-whisper
+      - uvicorn
