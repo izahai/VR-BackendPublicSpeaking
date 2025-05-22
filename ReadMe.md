@@ -1,5 +1,5 @@
 ## Workflow
-![Approach](https://raw.githubusercontent.com/openai/whisper/main/approach.png)
+![Workflow](https://raw.githubusercontent.com/izahai/VR-Backend/refs/heads/main/workflow.png)
 
 ## Setup
 
