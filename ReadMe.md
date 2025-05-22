@@ -1,3 +1,6 @@
+## Workflow
+![Approach](https://raw.githubusercontent.com/openai/whisper/main/approach.png)
+
 ## Setup
 
 For Mac user, ffmpeg and ffprobe are essential make sure you export it in terminal
