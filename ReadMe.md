@@ -1,14 +1,16 @@
-# For Mac user, ffmpeg and ffprobe are essential make sure you export it in terminal
-export PATH="<path where ffmpeg and ffprobe are placed>:$PATH"
+## Setup
 
-# Create virtual env
-conda env create -f environment.yml
+For Mac user, ffmpeg and ffprobe are essential make sure you export it in terminal
+>    export PATH="<path where ffmpeg and ffprobe are placed>:$PATH"
 
-# Activate env
-conda activate VrBackend
+Create virtual env
+>    conda env create -f environment.yml
 
-# Get ip LAN
-ifconfig | grep inet
+Activate env
+>   conda activate VrBackend
 
-# Run
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+Get ip LAN
+>   ifconfig | grep inet
+
+Run
+> uvicorn main:app --host 0.0.0.0 --port 8000 --reload
