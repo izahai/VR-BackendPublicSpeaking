@@ -1,4 +1,5 @@
-videos/*
+record_chunks/*
 .env
 test_audio/*
 self.txt
+transcriptions/*

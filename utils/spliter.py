@@ -24,19 +24,24 @@ def split_text(
     if current_line:
         lines.append(" ".join(current_line))
 
-    i = 7
+    # Create spliting chunks (3 lines per chunk) into cluster
+    i = num_line_per_cluster
     cluster = []
-    ls_cluster.append([])
-    if len(lines) > 7:
+    ls_cluster.append([]) # First empty index
+    if len(lines) > num_line_per_cluster:
         while i < len(lines):
-            if ((i-7) % num_line_per_cluster) == 0 and i != 7:
+            if ((i-num_line_per_cluster) % num_line_per_cluster) == 0 and i != num_line_per_cluster:
                 ls_cluster.append(cluster)
                 cluster = []
-            cluster.append(" ".join([lines[i-1], lines[i]]))
+            cluster.append(" ".join([lines[i-2], lines[i-1], lines[i]]))
             i += 1
 
     # The last cluster
     if cluster:
         ls_cluster.append(cluster)
         
+    with open("tmp/ls_cluster.txt", "w") as f:
+        for item in ls_cluster:
+            f.write(f"{item}\n")
+
     return "\n".join(lines), ls_cluster, len(lines)

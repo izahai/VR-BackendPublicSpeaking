@@ -36,10 +36,11 @@ def promp_format(trans_path, ori_trans):
         """
     return prompt
 
-def read_transcribed_text(id_record):
-    with open(f"{id_record}.txt", "r", encoding="utf-8") as f:
+def read_transcribed_text(trans_path):
+    with open(trans_path, "r", encoding="utf-8") as f:
         return f.read()
     
 def read_input_str(filepath):
     with open(filepath, "r", encoding="utf-8") as f:
         return f.read()
+

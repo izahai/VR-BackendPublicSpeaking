@@ -12,3 +12,5 @@ dependencies:
       - fastapi
       - openai-whisper
       - uvicorn
+      - python-multipart
+      - matplotlib

@@ -8,7 +8,7 @@ def count_words_per_line(file_path):
     return word_counts
 
 # Step 2: Plot and save the line diagram
-def plot_word_counts(word_counts, output_image='output.png'):
+def plot_word_counts(word_counts, output_img):
     plt.figure(figsize=(10, 5))
     
     # Generate X values in seconds (10, 20, 30, ...)
@@ -29,13 +29,10 @@ def plot_word_counts(word_counts, output_image='output.png'):
     
     # Save and close
     plt.tight_layout()
-    plt.savefig(output_image)
+    plt.savefig(output_img)
     plt.close()
-    print(f"Diagram saved to {output_image}")
+    print(f"Diagram saved to {output_img}")
 
-# File path
-file_path = "transcriptions/3.txt"  # Replace with the actual file path
-
-# Execute
-word_counts = count_words_per_line(file_path)
-plot_word_counts(word_counts)
+def speed_visulize(transc_path, output_img='output.png'):
+    word_counts = count_words_per_line(transc_path)
+    plot_word_counts(word_counts, output_img)

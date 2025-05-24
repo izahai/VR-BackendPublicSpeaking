@@ -12,13 +12,16 @@ from dotenv import load_dotenv
 from utils.spliter import split_text 
 from utils.feat_embed import bert_feat_embed, maximun_similarity
 from utils.utils import *
+from utils.coherence_visual import speed_visulize
 from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq, pipeline
+import base64
+
 
 load_dotenv()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_DIRECTORY = "videos"
-TRANSCRIPTION_DIRECTORY = "transcriptions"
-os.makedirs(TRANSCRIPTION_DIRECTORY, exist_ok=True)
+UPLOAD_DIRECTORY = "record_chunks"
+TRANSCRIPTION_DIR = "transcriptions"
+os.makedirs(TRANSCRIPTION_DIR, exist_ok=True)
 os.makedirs(UPLOAD_DIRECTORY, exist_ok=True)
 
 
@@ -59,9 +62,6 @@ print("Extracting features from clusters...")
 ls_embed_cluster = bert_feat_embed(model_bert, ls_cluster)
 cur_idx_cluster = 0
 
-UPLOAD_DIRECTORY = "videos"
-os.makedirs(UPLOAD_DIRECTORY, exist_ok=True)
-
 @app.get("/api/stt_uploads")
 def ping():
     return {
@@ -70,9 +70,9 @@ def ping():
     }
 
 @app.get("/api/GPT_feedback")
-def gpt_feedback():
+async def gpt_feedback():
     try:
-        prompt = promp_format(os.path.join(TRANSCRIPTION_DIRECTORY, f"{str(id_record_folder)}.txt"), input_text)
+        prompt = promp_format(os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_folder)}.txt"), input_text)
 
         response = client.chat.completions.create(
             model="gpt-4.1",
@@ -91,9 +91,26 @@ def gpt_feedback():
 
         feedback = response.choices[0].message.content
         feedback = feedback.replace("*", "")
-        save_txt(feedback, os.path.join(TRANSCRIPTION_DIRECTORY, f"{str(id_record_folder)}_fb.txt"))
-        feedback += "\n" + read_transcribed_text(id_record_folder)
-        return {"feedback": feedback}
+        save_txt(feedback, os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_folder)}_fb.txt"))
+        
+        chart_path = os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_folder)}_chart.png")
+        transcribed_path = os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_folder)}.txt")
+        
+        feedback += "\n\n\n" + "Transcribed text:\n" + read_transcribed_text(transcribed_path)
+
+        # Create speed line chart
+        speed_visulize(
+            transcribed_path,
+            chart_path,
+        )
+        with open(chart_path, "rb") as img_file:
+            img_base64 = base64.b64encode(img_file.read()).decode("utf-8")
+
+
+        return {
+            "feedback": feedback,
+            "img_base64": img_base64
+        }
 
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
@@ -108,11 +125,12 @@ def create_new_record_folder():
 
     return {
         "new_id_folder": id_record_folder,
+        "teleprompter_script": format_txt,
         "numCluster": len(ls_cluster),
         "message": "Create successfully!",
     }
 
-@app.post("/api/stt_uploads")
+@app.post("/api/stt_upload")
 def upload_video(
     id: int = Form(...),
     file: UploadFile = File(...),
@@ -137,10 +155,9 @@ def upload_video(
         shutil.copyfileobj(file.file, file_object)
 
     t1 = time.time()
-    #transcription = model_whisper.transcribe(file_location, language="en")["text"]
-    transcription = pipe(file_location)["text"]
-    save_txt(transcription, os.path.join(TRANSCRIPTION_DIRECTORY, f"{str(id_record_folder)}.txt"))
-    #transcription = "Skibidi skibidi skibidi !!!"
+    #transcription = pipe(file_location, generate_kwargs={"language": "english"})["text"]
+    transcription = "skibidi skibidi skibidi skibidi skibidi skibidi skibidi skibidi skibidi"
+    save_txt(transcription, os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_folder)}.txt"))
     t1 = time.time() - t1
 
     t2 = time.time()

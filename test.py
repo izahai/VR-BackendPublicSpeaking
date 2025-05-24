@@ -1,8 +1,10 @@
 import os
-from utils.utils import read_input_str
+from utils.coherence_visual import speed_visulize
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-input_text = read_input_str(os.path.join(BASE_DIR, "input_txt", "input.txt")) 
-
-print(input_text)
+TRANSCRIPTION_DIR = "transcriptions"
+id_record_folder=13
+chart_path = os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_folder)}_chart.png")
+speed_visulize(
+    os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_folder)}_fb.txt"),
+    chart_path,
+)
