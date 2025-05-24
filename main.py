@@ -155,8 +155,8 @@ def upload_video(
         shutil.copyfileobj(file.file, file_object)
 
     t1 = time.time()
-    #transcription = pipe(file_location, generate_kwargs={"language": "english"})["text"]
-    transcription = "skibidi skibidi skibidi skibidi skibidi skibidi skibidi skibidi skibidi"
+    transcription = pipe(file_location, generate_kwargs={"language": "english"})["text"]
+    #transcription = "skibidi skibidi skibidi skibidi skibidi skibidi skibidi skibidi skibidi"
     save_txt(transcription, os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_folder)}.txt"))
     t1 = time.time() - t1
 
