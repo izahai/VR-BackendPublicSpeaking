@@ -15,14 +15,20 @@ from utils.utils import *
 from utils.coherence_visual import speed_visulize
 from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq, pipeline
 import base64
+import cv2, glob
+from fastapi.responses import FileResponse
+
 
 
 load_dotenv()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_DIRECTORY = "record_chunks"
+RECORD_UPLOAD_DIRECTORY = "record_section"
+IMAGE_UPLOAD_DIRECTORY = "img_section"
 TRANSCRIPTION_DIR = "transcriptions"
 os.makedirs(TRANSCRIPTION_DIR, exist_ok=True)
-os.makedirs(UPLOAD_DIRECTORY, exist_ok=True)
+os.makedirs(RECORD_UPLOAD_DIRECTORY, exist_ok=True)
+os.makedirs(IMAGE_UPLOAD_DIRECTORY, exist_ok=True)
+
 
 
 app = FastAPI()
@@ -48,9 +54,9 @@ pipe = pipeline(
     device=device,
 )
 
-id_record_folder = len([
-    name for name in os.listdir(UPLOAD_DIRECTORY)
-    if os.path.isdir(os.path.join(UPLOAD_DIRECTORY, name))
+id_record_section = len([
+    name for name in os.listdir(RECORD_UPLOAD_DIRECTORY)
+    if os.path.isdir(os.path.join(RECORD_UPLOAD_DIRECTORY, name))
 ])
 
 # Read input teleprompt script
@@ -62,7 +68,7 @@ print("Extracting features from clusters...")
 ls_embed_cluster = bert_feat_embed(model_bert, ls_cluster)
 cur_idx_cluster = 0
 
-@app.get("/api/stt_uploads")
+@app.get("/api/stt_upload")
 def ping():
     return {
         "format_txt" : format_txt,
@@ -117,21 +123,23 @@ async def gpt_feedback():
 
 @app.post("/api/start_record")
 def create_new_record_folder():
-    global id_record_folder
-    id_record_folder += 1
-    new_folder_path = os.path.join(UPLOAD_DIRECTORY, str(id_record_folder))
+    global id_record_section
+    id_record_section += 1
+    audio_fpath = os.path.join(RECORD_UPLOAD_DIRECTORY, str(id_record_section))
+    img_fpath = os.path.join(IMAGE_UPLOAD_DIRECTORY, str(id_record_section))
     
-    os.makedirs(new_folder_path, exist_ok=True)
+    os.makedirs(audio_fpath, exist_ok=True)
+    os.makedirs(img_fpath, exist_ok=True)
 
     return {
-        "new_id_folder": id_record_folder,
+        "id_record_section": id_record_section,
         "teleprompter_script": format_txt,
         "numCluster": len(ls_cluster),
         "message": "Create successfully!",
     }
 
 @app.post("/api/stt_upload")
-def upload_video(
+def upload_audio_record(
     id: int = Form(...),
     file: UploadFile = File(...),
     cur_idx_cluster : int = Form(...),
@@ -149,7 +157,7 @@ def upload_video(
             "message": "End of script!"
         }
 
-    upload_record_folder = os.path.join(UPLOAD_DIRECTORY, str(id_record_folder))
+    upload_record_folder = os.path.join(RECORD_UPLOAD_DIRECTORY, str(id_record_section))
     file_location = os.path.join(upload_record_folder, file.filename)
     with open(file_location, "wb+") as file_object:
         shutil.copyfileobj(file.file, file_object)
@@ -157,7 +165,7 @@ def upload_video(
     t1 = time.time()
     transcription = pipe(file_location, generate_kwargs={"language": "english"})["text"]
     #transcription = "skibidi skibidi skibidi skibidi skibidi skibidi skibidi skibidi skibidi"
-    save_txt(transcription, os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_folder)}.txt"))
+    save_txt(transcription, os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_section)}.txt"))
     t1 = time.time() - t1
 
     t2 = time.time()
@@ -179,6 +187,44 @@ def upload_video(
         "similarity": max_sim,
         "message": "Yes!"
     }
+
+@app.post("/api/image_upload")
+async def upload_image(
+    file: UploadFile = File(...)
+):
+    img_fpath = os.path.join(IMAGE_UPLOAD_DIRECTORY, str(id_record_section))
+    if not os.path.exists(img_fpath):
+        return {"error": "Image fpath does not exist"}
+    
+    filepath =  os.path.join(img_fpath, file.filename)    
+    with open(filepath, "wb") as f:
+        f.write(await file.read())
+
+    return {"status": "ok", "file": file.filename}
+    
+@app.post("api/finalize_video")
+async def finalize_video():
+    folder = os.path.join(IMAGE_UPLOAD_DIRECTORY, str(id_record_section))
+    images = sorted(glob.glob(f"{folder}/*.png"))
+
+    if not images:
+        return {"error": "No images uploaded"}
+    
+    # Read first image to get video shape
+    frame = cv2.imread(images[0])
+    h, w, _ = frame.shape
+
+    video_path = f"{folder}/output_{id_record_section}.mp4"
+    out = cv2.VideoWriter(video_path, cv2.VideoWriter_fourcc(*'mp4v'), 30, (w, h))
+
+    for img_path in images:
+        frame = cv2.imread(img_path)
+        out.write(frame)
+
+    out.release()
+
+    # Return file response
+    return FileResponse(video_path, media_type="video/mp4", filename="output.mp4")
 
 
 if __name__ == "__main__":
