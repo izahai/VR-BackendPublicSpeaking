@@ -214,7 +214,8 @@ async def finalize_video():
     frame = cv2.imread(images[0])
     h, w, _ = frame.shape
 
-    video_path = f"{folder}/output_{id_record_section}.mp4"
+    video_name = f"output_{id_record_section}.mp4"
+    video_path = f"{folder}/{video_name}"
     out = cv2.VideoWriter(video_path, cv2.VideoWriter_fourcc(*'mp4v'), 30, (w, h))
 
     for img_path in images:
@@ -224,7 +225,7 @@ async def finalize_video():
     out.release()
 
     # Return file response
-    return FileResponse(video_path, media_type="video/mp4", filename="output.mp4")
+    return FileResponse(video_path, media_type="video/mp4", filename=video_name)
 
 
 if __name__ == "__main__":
