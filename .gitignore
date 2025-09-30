@@ -3,3 +3,7 @@ record_chunks/*
 test_audio/*
 self.txt
 transcriptions/*
+/img_section
+/record_section
+*.pyc
+/__pycache__

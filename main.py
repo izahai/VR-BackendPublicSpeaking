@@ -202,10 +202,12 @@ async def upload_image(
 
     return {"status": "ok", "file": file.filename}
     
-@app.post("api/finalize_video")
+@app.get("/api/finalize_video")
 async def finalize_video():
+    print(f"Finalize the video")
+
     folder = os.path.join(IMAGE_UPLOAD_DIRECTORY, str(id_record_section))
-    images = sorted(glob.glob(f"{folder}/*.png"))
+    images = sorted(glob.glob(f"{folder}/*.jpg"))
 
     if not images:
         return {"error": "No images uploaded"}
@@ -214,18 +216,24 @@ async def finalize_video():
     frame = cv2.imread(images[0])
     h, w, _ = frame.shape
 
-    video_name = f"output_{id_record_section}.mp4"
-    video_path = f"{folder}/{video_name}"
-    out = cv2.VideoWriter(video_path, cv2.VideoWriter_fourcc(*'mp4v'), 30, (w, h))
+    # 🔑 Backend saved name (unique)
+    backend_video_name = f"output_{id_record_section}.mp4"
+    backend_video_path = os.path.join(folder, backend_video_name)
 
+    print(f"Writing video: {backend_video_path}")
+
+    out = cv2.VideoWriter(backend_video_path, cv2.VideoWriter_fourcc(*'mp4v'), 15, (w, h))
     for img_path in images:
         frame = cv2.imread(img_path)
         out.write(frame)
-
     out.release()
 
-    # Return file response
-    return FileResponse(video_path, media_type="video/mp4", filename=video_name)
+    # 🔑 Always send to client as "output.mp4"
+    return FileResponse(
+        backend_video_path,
+        media_type="video/mp4",
+        filename="output.mp4"
+    )
 
 
 if __name__ == "__main__":
