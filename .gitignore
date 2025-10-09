@@ -7,3 +7,8 @@ transcriptions/*
 /record_section
 *.pyc
 /__pycache__
+*.srt
+/__pycache__
+*.pyc
+.DS_Store
+/utils/__pycache__

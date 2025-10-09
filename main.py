@@ -17,18 +17,18 @@ from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq, pipeline
 import base64
 import cv2, glob
 from fastapi.responses import FileResponse
-
-
+import ffmpeg
 
 load_dotenv()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 RECORD_UPLOAD_DIRECTORY = "record_section"
 IMAGE_UPLOAD_DIRECTORY = "img_section"
 TRANSCRIPTION_DIR = "transcriptions"
+SUBTITLE_DIR = "subtitles"
 os.makedirs(TRANSCRIPTION_DIR, exist_ok=True)
 os.makedirs(RECORD_UPLOAD_DIRECTORY, exist_ok=True)
 os.makedirs(IMAGE_UPLOAD_DIRECTORY, exist_ok=True)
-
+os.makedirs(SUBTITLE_DIR, exist_ok=True)
 
 
 app = FastAPI()
@@ -78,29 +78,31 @@ def ping():
 @app.get("/api/GPT_feedback")
 async def gpt_feedback():
     try:
-        prompt = promp_format(os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_folder)}.txt"), input_text)
+        # prompt = promp_format(os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_section)}.txt"), input_text)
 
-        response = client.chat.completions.create(
-            model="gpt-4.1",
-            messages=[
-                {
-                    "role": "system",
-                    "content": dev_prompt
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            temperature=0.7
-        )
+        # response = client.chat.completions.create(
+        #     model="gpt-4.1",
+        #     messages=[
+        #         {
+        #             "role": "system",
+        #             "content": dev_prompt
+        #         },
+        #         {
+        #             "role": "user",
+        #             "content": prompt
+        #         }
+        #     ],
+        #     temperature=0.7
+        # )
 
-        feedback = response.choices[0].message.content
-        feedback = feedback.replace("*", "")
-        save_txt(feedback, os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_folder)}_fb.txt"))
-        
-        chart_path = os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_folder)}_chart.png")
-        transcribed_path = os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_folder)}.txt")
+        #feedback = response.choices[0].message.content
+        #feedback = feedback.replace("*", "")
+
+        #save_txt(feedback, os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_section)}_fb.txt"))
+        feedback = "GPT feedback placeholder..."
+
+        chart_path = os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_section)}_chart.png")
+        transcribed_path = os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_section)}.txt")
         
         feedback += "\n\n\n" + "Transcribed text:\n" + read_transcribed_text(transcribed_path)
 
@@ -173,12 +175,12 @@ def upload_audio_record(
     max_sim, max_idx = maximun_similarity(trans_embedding, ls_embed_cluster[next_idx_cluster])
     t2 = time.time() - t2
 
-    print(f"🗣️ Transcription: {transcription}")
-    print(f"🔍 Best line: {ls_cluster[next_idx_cluster][max_idx]}")
-    print(f"🔍 Similarity: {max_sim}")
-    print(f"🔍 Next cluster index: {next_idx_cluster}")
-    print(f"⏱️ Transcription whisper time: {t1:.2f} seconds")
-    print(f"⏱️ Similarity bert time: {t2:.2f} seconds")
+    print(f"Transcription: {transcription}")
+    print(f"Best line: {ls_cluster[next_idx_cluster][max_idx]}")
+    print(f"Similarity: {max_sim}")
+    print(f"Next cluster index: {next_idx_cluster}")
+    print(f"Transcription whisper time: {t1:.2f} seconds")
+    print(f"Similarity bert time: {t2:.2f} seconds")
 
     return {
         "id": id,
@@ -204,37 +206,84 @@ async def upload_image(
     
 @app.get("/api/finalize_video")
 async def finalize_video():
-    print(f"Finalize the video")
+    print(f"Finalizing video for section {id_record_section}")
 
-    folder = os.path.join(IMAGE_UPLOAD_DIRECTORY, str(id_record_section))
-    images = sorted(glob.glob(f"{folder}/*.jpg"))
-
+    #  --- Collect image frames ---
+    image_folder = os.path.join(IMAGE_UPLOAD_DIRECTORY, str(id_record_section))
+    images = sorted(glob.glob(f"{image_folder}/*.jpg"))
     if not images:
-        return {"error": "No images uploaded"}
+        raise HTTPException(status_code=400, detail="No images uploaded")
     
-    # Read first image to get video shape
+    #  --- Collect audio segments ---
+    audio_folder = os.path.join(RECORD_UPLOAD_DIRECTORY, str(id_record_section))
+    audio_files = sorted(glob.glob(f"{audio_folder}/*.wav"))
+    if not audio_files:
+        raise HTTPException(status_code=400, detail="No audio files uploaded")
+    
+    # --- Create base video from images ---
     frame = cv2.imread(images[0])
     h, w, _ = frame.shape
-
-    # 🔑 Backend saved name (unique)
     backend_video_name = f"output_{id_record_section}.mp4"
-    backend_video_path = os.path.join(folder, backend_video_name)
+    backend_video_path = os.path.join(image_folder, backend_video_name)
+    fps = 15
 
-    print(f"Writing video: {backend_video_path}")
+    print(f"Creating base video at {backend_video_path}")
 
-    out = cv2.VideoWriter(backend_video_path, cv2.VideoWriter_fourcc(*'mp4v'), 15, (w, h))
+    out = cv2.VideoWriter(backend_video_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
     for img_path in images:
         frame = cv2.imread(img_path)
         out.write(frame)
     out.release()
 
-    # 🔑 Always send to client as "output.mp4"
+    # --- Generate subtitle from transcription ---
+    transcribed_path = os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_section)}.txt")
+    srt_path = os.path.join(SUBTITLE_DIR, f"{str(id_record_section)}.srt")
+    generate_srt_from_txt(transcribed_path, srt_path, segment_duration=10)
+
+    # --- Concatenate audio segments using ffmpeg-python ---
+    filelist_path = os.path.join(audio_folder, "filelist.txt")
+    with open(filelist_path, "w") as f:
+        for a in audio_files:
+            f.write(f"file '{os.path.abspath(a)}'\n")
+
+    merged_audio_path = os.path.join(audio_folder, "merged_audio.wav")
+    print(f"Concatenating {len(audio_files)} audio clips...")
+
+    (
+        ffmpeg
+        .input(filelist_path, format='concat', safe=0)
+        .output(merged_audio_path, c='copy')
+        .run(overwrite_output=True, quiet=False)
+    )
+
+    # --- Merge video + audio ---
+    final_output_path = os.path.join(image_folder, f"final_{id_record_section}.mp4")
+    print(f"🎬 Merging audio with video → {final_output_path}")
+
+    video_in = ffmpeg.input(backend_video_path)
+    audio_in = ffmpeg.input(merged_audio_path)
+
+    (
+        ffmpeg
+        .output(
+            video_in,
+            audio_in,
+            final_output_path,
+            vf=f"subtitles={srt_path}:force_style='Fontsize=24,PrimaryColour=&HFFFFFF&'",
+            vcodec='libx264',  
+            acodec='aac',      # encode audio to AAC for MP4 container
+            shortest=None      # stop at the shortest stream
+        )
+        .run(overwrite_output=True, quiet=False)
+    )
+
+    print(f"(v) Final video generated at {final_output_path}")
+
     return FileResponse(
-        backend_video_path,
+        final_output_path,
         media_type="video/mp4",
         filename="output.mp4"
     )
-
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

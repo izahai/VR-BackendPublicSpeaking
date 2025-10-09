@@ -1,0 +1,35 @@
+# --- Core server ---
+fastapi==0.115.0
+uvicorn==0.30.6
+python-dotenv==1.0.1
+
+# --- Audio / Speech ---
+whisperx==3.1.1          # works better than plain openai-whisper, compatible with CUDA
+ffmpeg-python==0.2.0
+soundfile==0.12.1
+
+# --- OpenAI API ---
+openai==1.42.0
+
+# --- Transformers / Models ---
+transformers==4.44.2
+sentence-transformers==3.1.1
+torch==2.3.1
+torchaudio==2.3.1
+accelerate==0.33.0
+
+# --- Image / Video ---
+opencv-python==4.10.0.84
+pillow==10.4.0
+
+# --- Utils / Visualization ---
+matplotlib==3.9.2
+numpy==1.26.4
+pandas==2.2.3
+
+# --- Optional (if you have charts or feature visualizations) ---
+scikit-learn==1.5.2
+
+# --- For file encoding / safety ---
+tqdm==4.66.5
+requests==2.32.3
