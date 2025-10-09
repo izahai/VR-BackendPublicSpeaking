@@ -258,7 +258,7 @@ async def finalize_video():
 
     # --- Merge video + audio ---
     final_output_path = os.path.join(image_folder, f"final_{id_record_section}.mp4")
-    print(f"🎬 Merging audio with video → {final_output_path}")
+    print(f"🎬 Merging audio with video -> {final_output_path}")
 
     video_in = ffmpeg.input(backend_video_path)
     audio_in = ffmpeg.input(merged_audio_path)
@@ -284,6 +284,19 @@ async def finalize_video():
         media_type="video/mp4",
         filename="output.mp4"
     )
+
+@app.post("/api/image_zip_upload")
+async def upload_image_zip(file: UploadFile = File(...)):
+    import zipfile, io, os
+    img_dir = os.path.join(IMAGE_UPLOAD_DIRECTORY, str(id_record_section))
+    os.makedirs(img_dir, exist_ok=True)
+
+    content = await file.read()
+    with zipfile.ZipFile(io.BytesIO(content)) as zf:
+        zf.extractall(img_dir)
+
+    return {"status": "ok", "num_files": len(zf.namelist())}
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
