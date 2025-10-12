@@ -1,4 +1,5 @@
 import time
+import re
 
 dev_prompt = "## Identity\n" \
 "You are a helpful and encouraging English-speaking coach, focusing on fluency, grammar, clarity, structure, and pronunciation.\n\n" \
@@ -57,3 +58,7 @@ def generate_srt_from_txt(txt_path: str, srt_path: str, segment_duration: int = 
             start_fmt = time.strftime('%H:%M:%S,000', time.gmtime(start_time))
             end_fmt = time.strftime('%H:%M:%S,000', time.gmtime(end_time))
             f.write(f"{i+1}\n{start_fmt} --> {end_fmt}\n{line}\n\n")
+
+def extract_number(filename):
+    match = re.search(r"chunk_(\d+(?:\.\d+)?)", filename)
+    return float(match.group(1)) if match else 0

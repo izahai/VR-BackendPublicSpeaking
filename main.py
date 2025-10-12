@@ -216,7 +216,7 @@ async def finalize_video():
     
     #  --- Collect audio segments ---
     audio_folder = os.path.join(RECORD_UPLOAD_DIRECTORY, str(id_record_section))
-    audio_files = sorted(glob.glob(f"{audio_folder}/*.wav"))
+    audio_files = sorted(glob.glob(f"{audio_folder}/*.wav"), key=extract_number)
     if not audio_files:
         raise HTTPException(status_code=400, detail="No audio files uploaded")
     
