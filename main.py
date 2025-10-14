@@ -225,7 +225,7 @@ async def finalize_video():
     h, w, _ = frame.shape
     backend_video_name = f"output_{id_record_section}.mp4"
     backend_video_path = os.path.join(image_folder, backend_video_name)
-    fps = 15
+    fps = 8
 
     print(f"Creating base video at {backend_video_path}")
 
