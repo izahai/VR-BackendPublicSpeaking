@@ -1,5 +1,5 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form
-from fastapi.responses import JSONResponse, Request, FileResponse, StreamingResponse
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Request
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 import shutil
 from openai import OpenAI
 from sentence_transformers import SentenceTransformer
