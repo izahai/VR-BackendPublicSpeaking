@@ -16,6 +16,9 @@ from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq, pipeline
 import base64
 import cv2, glob
 import ffmpeg
+from fastapi.middleware.cors import CORSMiddleware
+
+
 
 
 load_dotenv()
@@ -32,6 +35,15 @@ os.makedirs(SUBTITLE_DIR, exist_ok=True)
 
 app = FastAPI()
 client = OpenAI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # or specify your Quest device IP/domain
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
@@ -248,12 +260,31 @@ async def finalize_video():
     merged_audio_path = os.path.join(audio_folder, "merged_audio.wav")
     print(f"Concatenating {len(audio_files)} audio clips...")
 
+    # (
+    #     ffmpeg
+    #     .input(filelist_path, format='concat', safe=0)
+    #     .output(
+    #         merged_audio_path,
+    #         acodec='pcm_s16le',
+    #         ar=16000  # (optional) enforce 16 kHz sample rate
+    #     )
+    #     .run(overwrite_output=True, quiet=False)
+    # )
+
     (
         ffmpeg
         .input(filelist_path, format='concat', safe=0)
-        .output(merged_audio_path, c='copy')
+        .output(
+            merged_audio_path,
+            acodec='pcm_s16le',
+            ar=16000,
+            vsync='cfr'
+        )
+        .global_args('-fflags', '+genpts')
+        .global_args('-async', '1')
         .run(overwrite_output=True, quiet=False)
     )
+
 
     # --- Merge video + audio ---
     final_output_path = os.path.join(image_folder, f"final_{id_record_section}.mp4")
@@ -269,6 +300,7 @@ async def finalize_video():
             audio_in,
             final_output_path,
             vf=f"subtitles={srt_path}:force_style='Fontsize=24,PrimaryColour=&HFFFFFF&'",
+            af="volume=2.0", # boost audio volume x2
             vcodec='libx264',  
             acodec='aac',      # encode audio to AAC for MP4 container
             movflags='+faststart', # for streaming
@@ -346,7 +378,15 @@ async def stream_video(request: Request):
             "Content-Type": "video/mp4",
         }
 
-        return StreamingResponse(iterfile(start, end + 1), status_code=206, headers=headers)
+        return StreamingResponse(
+            iterfile(start, end + 1),
+            status_code=206,
+            headers={
+                **headers,
+                "Cache-Control": "no-store",
+            },
+        )
+
 
     # No Range header → send full file
     headers = {
