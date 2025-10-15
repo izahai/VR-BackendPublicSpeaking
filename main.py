@@ -271,6 +271,7 @@ async def finalize_video():
             vf=f"subtitles={srt_path}:force_style='Fontsize=24,PrimaryColour=&HFFFFFF&'",
             vcodec='libx264',  
             acodec='aac',      # encode audio to AAC for MP4 container
+            movflags='+faststart', # for streaming
             shortest=None      # stop at the shortest stream
         )
         .run(overwrite_output=True, quiet=False)
@@ -278,11 +279,16 @@ async def finalize_video():
 
     print(f"(v) Final video generated at {final_output_path}")
 
-    return FileResponse(
-        final_output_path,
-        media_type="video/mp4",
-        filename="output.mp4"
-    )
+    return {
+        "status": "success",
+        "message": "Video merged successfully!",
+    }
+
+    # return FileResponse(
+    #     final_output_path,
+    #     media_type="video/mp4",
+    #     filename="output.mp4"
+    # )
 
 @app.post("/api/image_zip_upload")
 async def upload_image_zip(file: UploadFile = File(...)):
