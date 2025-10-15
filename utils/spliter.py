@@ -1,6 +1,6 @@
 # 14 lines
 
-max_char_a_line = 49
+max_char_a_line = 46
 
 def split_text(
     text: str, 
@@ -40,7 +40,7 @@ def split_text(
     if cluster:
         ls_cluster.append(cluster)
         
-    with open("tmp/ls_cluster.txt", "w") as f:
+    with open("ls_cluster.txt", "w") as f:
         for item in ls_cluster:
             f.write(f"{item}\n")
 

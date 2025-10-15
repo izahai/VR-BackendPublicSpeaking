@@ -1,7 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Request, FileResponse, StreamingResponse
 import shutil
-import whisper
 from openai import OpenAI
 from sentence_transformers import SentenceTransformer
 import os
@@ -16,8 +15,8 @@ from utils.coherence_visual import speed_visulize
 from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq, pipeline
 import base64
 import cv2, glob
-from fastapi.responses import FileResponse
 import ffmpeg
+
 
 load_dotenv()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -296,6 +295,61 @@ async def upload_image_zip(file: UploadFile = File(...)):
         zf.extractall(img_dir)
 
     return {"status": "ok", "num_files": len(zf.namelist())}
+
+@app.get("/api/stream_video")
+async def stream_video(request: Request):
+    """
+    Stream the generated MP4 to clients (supports HTTP Range for partial loading).
+    This allows Unity VideoPlayer (or browsers) to start playback immediately.
+    """
+    video_path = os.path.join(
+        IMAGE_UPLOAD_DIRECTORY,
+        str(id_record_section),
+        f"final_{id_record_section}.mp4"
+    )
+
+    if not os.path.exists(video_path):
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    file_size = os.path.getsize(video_path)
+    range_header = request.headers.get("range")
+    chunk_size = 1024 * 1024  # 1 MB chunks
+
+    def iterfile(start: int = 0, end: int = None):
+        with open(video_path, "rb") as f:
+            f.seek(start)
+            remaining = (end or file_size) - start
+            while remaining > 0:
+                data = f.read(min(chunk_size, remaining))
+                if not data:
+                    break
+                remaining -= len(data)
+                yield data
+
+    if range_header:
+        # Example: "bytes=1000-"
+        bytes_range = range_header.replace("bytes=", "").split("-")
+        start = int(bytes_range[0]) if bytes_range[0] else 0
+        end = int(bytes_range[1]) if len(bytes_range) > 1 and bytes_range[1] else file_size - 1
+        length = end - start + 1
+
+        headers = {
+            "Content-Range": f"bytes {start}-{end}/{file_size}",
+            "Accept-Ranges": "bytes",
+            "Content-Length": str(length),
+            "Content-Type": "video/mp4",
+        }
+
+        return StreamingResponse(iterfile(start, end + 1), status_code=206, headers=headers)
+
+    # No Range header → send full file
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Length": str(file_size),
+        "Content-Type": "video/mp4",
+    }
+
+    return StreamingResponse(iterfile(), headers=headers)
 
 
 if __name__ == "__main__":
