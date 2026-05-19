@@ -19,6 +19,7 @@ import ffmpeg
 from statistics import mean, stdev
 import json
 from fastapi.middleware.cors import CORSMiddleware
+import librosa
 
 
 
@@ -225,9 +226,25 @@ def upload_audio_record(
     t_online_start = time.time()
 
     t1 = time.time()
-    transcription = pipe(file_location, generate_kwargs={"language": "english"})["text"]
+    audio_array, sampling_rate = librosa.load(file_location, sr=16000)
+    
+    # Process and generate
+    input_features = processor(audio_array, sampling_rate=sampling_rate, return_tensors="pt").input_features
+    input_features = input_features.to(device).to(torch_dtype)
+    
+    # Force language generation targets
+    forced_decoder_ids = processor.get_decoder_prompt_ids(language="english", task="transcribe")
+    
+    predicted_ids = model_whisper.generate(input_features, forced_decoder_ids=forced_decoder_ids)
+    transcription = processor.batch_decode(predicted_ids, skip_special_tokens=True)[0]
+    
     save_txt(transcription, os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_section)}.txt"))
     asr_time = time.time() - t1
+    
+    # --- OLD API Whisper ---
+    # transcription = pipe(file_location, generate_kwargs={"language": "english"})["text"]
+    # save_txt(transcription, os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_section)}.txt"))
+    # asr_time = time.time() - t1
     t1 = time.time() - t1
 
     t2 = time.time()
