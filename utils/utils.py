@@ -59,6 +59,17 @@ def generate_srt_from_txt(txt_path: str, srt_path: str, segment_duration: int = 
             end_fmt = time.strftime('%H:%M:%S,000', time.gmtime(end_time))
             f.write(f"{i+1}\n{start_fmt} --> {end_fmt}\n{line}\n\n")
 
-def extract_number(filename):
-    match = re.search(r"chunk_(\d+(?:\.\d+)?)", filename)
-    return float(match.group(1)) if match else 0
+# def extract_number(filename):
+#     match = re.search(r'chunk_(\d+(?:\.\d+)?)', filename)
+#     return float(match.group(1)) if match else 0
+
+
+# def extract_number(filename: str):
+#     match = re.search(r'chunk_(\d+(?:\.\d+)?)\.wav', filename)
+#     return float(match.group(1)) if match else 0.0
+
+def extract_number(filename: str):
+    match = re.search(r'chunk_(\d+(?:\.\d+)?)\.wav$', filename)
+    return float(match.group(1)) if match else 0.0
+
+

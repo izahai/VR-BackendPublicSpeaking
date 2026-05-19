@@ -16,6 +16,8 @@ from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq, pipeline
 import base64
 import cv2, glob
 import ffmpeg
+from statistics import mean, stdev
+import json
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -27,6 +29,9 @@ RECORD_UPLOAD_DIRECTORY = "record_section"
 IMAGE_UPLOAD_DIRECTORY = "img_section"
 TRANSCRIPTION_DIR = "transcriptions"
 SUBTITLE_DIR = "subtitles"
+METRICS_DIR = "metrics"
+
+os.makedirs(METRICS_DIR, exist_ok=True)
 os.makedirs(TRANSCRIPTION_DIR, exist_ok=True)
 os.makedirs(RECORD_UPLOAD_DIRECTORY, exist_ok=True)
 os.makedirs(IMAGE_UPLOAD_DIRECTORY, exist_ok=True)
@@ -51,7 +56,9 @@ torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
 processor = AutoProcessor.from_pretrained("openai/whisper-large-v3-turbo")
 model_whisper = AutoModelForSpeechSeq2Seq.from_pretrained("openai/whisper-large-v3-turbo")
 
-model_bert = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
+# text_encoder = "BAAI/bge-large-en-v1.5"
+text_encoder = "sentence-transformers/all-mpnet-base-v2"
+model_bert = SentenceTransformer(text_encoder)
 
 model_bert.to(device)
 model_whisper.to(device)
@@ -70,14 +77,54 @@ id_record_section = len([
     if os.path.isdir(os.path.join(RECORD_UPLOAD_DIRECTORY, name))
 ])
 
+current_metrics = {
+    "asr_latency": [],
+    "semantic_matching": [],
+    "online_alignment": [],
+    "cosine_similarity": [],
+    "video_render": None,
+}
+
 # Read input teleprompt script
 input_text = read_input_str(os.path.join(BASE_DIR, "input_txt", "input.txt")) 
 
 print("Splitting text into clusters...")
 format_txt, ls_cluster, num_lines = split_text(input_text)
 print("Extracting features from clusters...")
+offline_encoding_time = time.time()
 ls_embed_cluster = bert_feat_embed(model_bert, ls_cluster)
+offline_encoding_time = time.time() - offline_encoding_time
+OFFLINE_ENCODING_TIME = offline_encoding_time
 cur_idx_cluster = 0
+
+def save_metrics(section_id: int):
+    def mean_std(values):
+        if len(values) < 2:
+            return {
+                "mean": values[0] if values else 0.0,
+                "std": 0.0
+            }
+        return {
+            "mean": mean(values),
+            "std": stdev(values)
+        }
+
+    metrics_summary = {
+        "section_id": section_id,
+        "asr_latency_s": mean_std(current_metrics["asr_latency"]),
+        "semantic_matching_ms": mean_std(current_metrics["semantic_matching"]),
+        "online_speech_alignment_s": mean_std(current_metrics["online_alignment"]),
+        "average_cosine_similarity": mean_std(current_metrics["cosine_similarity"]),
+        "offline_semantic_encoding_s": OFFLINE_ENCODING_TIME,
+        "video_render_s": current_metrics["video_render"],
+    }
+
+    path = os.path.join(METRICS_DIR, f"section_{section_id}.json")
+    with open(path, "w") as f:
+        json.dump(metrics_summary, f, indent=4)
+
+    return metrics_summary
+
 
 @app.get("/api/stt_upload")
 def ping():
@@ -89,28 +136,28 @@ def ping():
 @app.get("/api/GPT_feedback")
 async def gpt_feedback():
     try:
-        # prompt = promp_format(os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_section)}.txt"), input_text)
+        prompt = promp_format(os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_section)}.txt"), input_text)
 
-        # response = client.chat.completions.create(
-        #     model="gpt-4.1",
-        #     messages=[
-        #         {
-        #             "role": "system",
-        #             "content": dev_prompt
-        #         },
-        #         {
-        #             "role": "user",
-        #             "content": prompt
-        #         }
-        #     ],
-        #     temperature=0.7
-        # )
+        response = client.chat.completions.create(
+            model="gpt-4.1",
+            messages=[
+                {
+                    "role": "system",
+                    "content": dev_prompt
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            temperature=0.7
+        )
 
-        #feedback = response.choices[0].message.content
-        #feedback = feedback.replace("*", "")
+        feedback = response.choices[0].message.content
+        feedback = feedback.replace("*", "")
 
-        #save_txt(feedback, os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_section)}_fb.txt"))
-        feedback = "GPT feedback placeholder..."
+        save_txt(feedback, os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_section)}_fb.txt"))
+        # feedback = "GPT feedback placeholder..."
 
         chart_path = os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_section)}_chart.png")
         transcribed_path = os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_section)}.txt")
@@ -175,16 +222,26 @@ def upload_audio_record(
     with open(file_location, "wb+") as file_object:
         shutil.copyfileobj(file.file, file_object)
 
+    t_online_start = time.time()
+
     t1 = time.time()
     transcription = pipe(file_location, generate_kwargs={"language": "english"})["text"]
-    #transcription = "skibidi skibidi skibidi skibidi skibidi skibidi skibidi skibidi skibidi"
     save_txt(transcription, os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_section)}.txt"))
+    asr_time = time.time() - t1
     t1 = time.time() - t1
 
     t2 = time.time()
-    trans_embedding = model_bert.encode(transcription, convert_to_tensor=True)
-    max_sim, max_idx = maximun_similarity(trans_embedding, ls_embed_cluster[next_idx_cluster])
+    trans_embedding = model_bert.encode(transcription, convert_to_tensor=True, normalize_embeddings=True)
+    max_sim1, max_idx1 = maximun_similarity(trans_embedding, ls_embed_cluster[next_idx_cluster])
+    max_sim2, max_idx2 = maximun_similarity(trans_embedding, ls_embed_cluster[next_idx_cluster+1])
+    max_sim = max(max_sim1, max_sim2)
+    cur_max_sim, max_idx = maximun_similarity(trans_embedding, ls_embed_cluster[next_idx_cluster-1])
+    if max_sim < cur_max_sim:
+        max_sim = 0
+    semantic_time = time.time() - t2
     t2 = time.time() - t2
+
+    online_time = time.time() - t_online_start
 
     print(f"Transcription: {transcription}")
     print(f"Best line: {ls_cluster[next_idx_cluster][max_idx]}")
@@ -192,6 +249,11 @@ def upload_audio_record(
     print(f"Next cluster index: {next_idx_cluster}")
     print(f"Transcription whisper time: {t1:.2f} seconds")
     print(f"Similarity bert time: {t2:.2f} seconds")
+
+    current_metrics["asr_latency"].append(asr_time)
+    current_metrics["semantic_matching"].append(semantic_time * 1000)  # ms
+    current_metrics["online_alignment"].append(online_time)
+    current_metrics["cosine_similarity"].append(float(max_sim))
 
     return {
         "id": id,
@@ -217,6 +279,7 @@ async def upload_image(
     
 @app.get("/api/finalize_video")
 async def finalize_video():
+    video_start_time = time.time()
     print(f"Finalizing video for section {id_record_section}")
 
     #  --- Collect image frames ---
@@ -227,7 +290,11 @@ async def finalize_video():
     
     #  --- Collect audio segments ---
     audio_folder = os.path.join(RECORD_UPLOAD_DIRECTORY, str(id_record_section))
-    audio_files = sorted(glob.glob(f"{audio_folder}/*.wav"), key=extract_number)
+    audio_files = [
+        f for f in sorted(glob.glob(f"{audio_folder}/*.wav"), key=extract_number)
+        if not os.path.basename(f).startswith("merged_")
+    ]
+
     if not audio_files:
         raise HTTPException(status_code=400, detail="No audio files uploaded")
     
@@ -260,17 +327,6 @@ async def finalize_video():
     merged_audio_path = os.path.join(audio_folder, "merged_audio.wav")
     print(f"Concatenating {len(audio_files)} audio clips...")
 
-    # (
-    #     ffmpeg
-    #     .input(filelist_path, format='concat', safe=0)
-    #     .output(
-    #         merged_audio_path,
-    #         acodec='pcm_s16le',
-    #         ar=16000  # (optional) enforce 16 kHz sample rate
-    #     )
-    #     .run(overwrite_output=True, quiet=False)
-    # )
-
     (
         ffmpeg
         .input(filelist_path, format='concat', safe=0)
@@ -288,7 +344,7 @@ async def finalize_video():
 
     # --- Merge video + audio ---
     final_output_path = os.path.join(image_folder, f"final_{id_record_section}.mp4")
-    print(f"🎬 Merging audio with video -> {final_output_path}")
+    print(f"Merging audio with video -> {final_output_path}")
 
     video_in = ffmpeg.input(backend_video_path)
     audio_in = ffmpeg.input(merged_audio_path)
@@ -311,16 +367,14 @@ async def finalize_video():
 
     print(f"(v) Final video generated at {final_output_path}")
 
+    current_metrics["video_render"] = time.time() - video_start_time
+
+    metrics = save_metrics(id_record_section)
+
     return {
         "status": "success",
         "message": "Video merged successfully!",
     }
-
-    # return FileResponse(
-    #     final_output_path,
-    #     media_type="video/mp4",
-    #     filename="output.mp4"
-    # )
 
 @app.post("/api/image_zip_upload")
 async def upload_image_zip(file: UploadFile = File(...)):
