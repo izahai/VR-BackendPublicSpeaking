@@ -200,6 +200,7 @@ def create_new_record_folder():
     }
 
 @app.post("/api/stt_upload")
+@app.post("/api/stt_upload")
 def upload_audio_record(
     id: int = Form(...),
     file: UploadFile = File(...),
@@ -207,14 +208,13 @@ def upload_audio_record(
 ):
     print(f"🟢 Received request: ID={id}, File={file.filename}")
     
-    # if not file.filename.endswith(".wav"):
-    #     raise HTTPException(status_code=400, detail="File must be a WAV audio file.")
     next_idx_cluster = cur_idx_cluster + 1
     if next_idx_cluster + 1 > len(ls_cluster):
         return {
             "id": id,
             "filename": file.filename,
             "similarity": 0,
+            "global_line_idx": -1,  # Added fallback value for end of script
             "message": "End of script!"
         }
 
@@ -241,31 +241,47 @@ def upload_audio_record(
     save_txt(transcription, os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_section)}.txt"))
     asr_time = time.time() - t1
     
-    # --- OLD API Whisper ---
-    # transcription = pipe(file_location, generate_kwargs={"language": "english"})["text"]
-    # save_txt(transcription, os.path.join(TRANSCRIPTION_DIR, f"{str(id_record_section)}.txt"))
-    # asr_time = time.time() - t1
-    t1 = time.time() - t1
-
     t2 = time.time()
     trans_embedding = model_bert.encode(transcription, convert_to_tensor=True, normalize_embeddings=True)
+    
     max_sim1, max_idx1 = maximun_similarity(trans_embedding, ls_embed_cluster[next_idx_cluster])
     max_sim2, max_idx2 = maximun_similarity(trans_embedding, ls_embed_cluster[next_idx_cluster+1])
-    max_sim = max(max_sim1, max_sim2)
-    cur_max_sim, max_idx = maximun_similarity(trans_embedding, ls_embed_cluster[next_idx_cluster-1])
+    cur_max_sim, max_idx3 = maximun_similarity(trans_embedding, ls_embed_cluster[next_idx_cluster-1])
+    
+    max_sim = 0
+    global_line_idx = -1
+    num_line_per_cluster = 5  # Ensure this matches your script's partitioning logic
+    
+    # --- Choose the max similarity cluster (next or 2 steps next) ---
+    if max_sim1 >= max_sim2:
+        max_sim = max_sim1
+        best_idx = max_idx1
+        chosen_cluster = next_idx_cluster
+    else:
+        max_sim = max_sim2
+        best_idx = max_idx2
+        chosen_cluster = next_idx_cluster + 1
+
+    # --- Do not scroll if the next cluster don't exceed cur cluster ---
     if max_sim < cur_max_sim:
         max_sim = 0
-    semantic_time = time.time() - t2
-    t2 = time.time() - t2
+        global_line_idx = -1  # Similarity falls behind the threshold of previous cluster
+        best_line_text = "Max similarity is still in the current cluster"
+    else:
+        # Calculate the absolute line index across the entire script
+        global_line_idx = (chosen_cluster * num_line_per_cluster) + best_idx
+        best_line_text = ls_cluster[chosen_cluster][best_idx]
 
+    semantic_time = time.time() - t2
     online_time = time.time() - t_online_start
 
     print(f"Transcription: {transcription}")
-    print(f"Best line: {ls_cluster[next_idx_cluster][max_idx]}")
+    print(f"Best line: {best_line_text}")
     print(f"Similarity: {max_sim}")
+    print(f"Global Line Index: {global_line_idx}")
     print(f"Next cluster index: {next_idx_cluster}")
     print(f"Transcription whisper time: {t1:.2f} seconds")
-    print(f"Similarity bert time: {t2:.2f} seconds")
+    print(f"Similarity bert time: {semantic_time:.2f} seconds")
 
     current_metrics["asr_latency"].append(asr_time)
     current_metrics["semantic_matching"].append(semantic_time * 1000)  # ms
@@ -277,6 +293,7 @@ def upload_audio_record(
         "filename": file.filename,
         "transcription": transcription,
         "similarity": max_sim,
+        "global_line_idx": global_line_idx,  # Explicitly included in JSON response
         "message": "Yes!"
     }
 
