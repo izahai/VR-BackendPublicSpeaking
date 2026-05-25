@@ -245,7 +245,7 @@ def upload_audio_record(
     
     max_sim1, max_idx1 = maximun_similarity(trans_embedding, ls_embed_cluster[next_idx_cluster])
     max_sim2, max_idx2 = maximun_similarity(trans_embedding, ls_embed_cluster[next_idx_cluster+1])
-    cur_max_sim, max_idx3 = maximun_similarity(trans_embedding, ls_embed_cluster[next_idx_cluster-1])
+    cur_max_sim, cur_max_idx = maximun_similarity(trans_embedding, ls_embed_cluster[next_idx_cluster-1])
     
     max_sim = 0
     global_line_idx = -1
@@ -264,7 +264,7 @@ def upload_audio_record(
     # --- Do not scroll if the next cluster don't exceed cur cluster ---
     if max_sim < cur_max_sim:
         max_sim = 0
-        global_line_idx = -1  # Similarity falls behind the threshold of previous cluster
+        global_line_idx = (chosen_cluster * num_line_per_cluster) + cur_max_idx
         best_line_text = "Max similarity is still in the current cluster"
     else:
         # Calculate the absolute line index across the entire script
