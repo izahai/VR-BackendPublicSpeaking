@@ -263,7 +263,7 @@ def upload_audio_record(
 
     # --- Do not scroll if the next cluster don't exceed cur cluster ---
     if max_sim < cur_max_sim:
-        max_sim = 0
+        max_sim = -1
         global_line_idx = (cur_idx_cluster * num_line_per_cluster) + cur_max_idx
         best_line_text = "Max similarity is still in the current cluster"
     else:
