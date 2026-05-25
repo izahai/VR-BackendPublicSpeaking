@@ -200,7 +200,6 @@ def create_new_record_folder():
     }
 
 @app.post("/api/stt_upload")
-@app.post("/api/stt_upload")
 def upload_audio_record(
     id: int = Form(...),
     file: UploadFile = File(...),
@@ -280,8 +279,10 @@ def upload_audio_record(
     print(f"Similarity: {max_sim}")
     print(f"Global Line Index: {global_line_idx}")
     print(f"Next cluster index: {next_idx_cluster}")
-    print(f"Transcription whisper time: {t1:.2f} seconds")
+    
+    print(f"Transcription whisper time: {asr_time:.2f} seconds")
     print(f"Similarity bert time: {semantic_time:.2f} seconds")
+    print(f"Total online alignment time: {online_time:.2f} seconds")
 
     current_metrics["asr_latency"].append(asr_time)
     current_metrics["semantic_matching"].append(semantic_time * 1000)  # ms
