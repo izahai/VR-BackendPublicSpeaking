@@ -6,7 +6,7 @@ import os
 # Patch asyncio loop for Colab
 nest_asyncio.apply()
 
-# ⚠️ WARNING: It is highly recommended to rotate/revoke these tokens as they are publicly visible.
+# Fake OPENAI_API_KEY
 os.environ["OPENAI_API_KEY"] = "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"
 NGROK_TOKEN = "2wnEVIZZXhQL1RF0i4LKzRWk4KK_7aKwWMr2mv1r8VWghNJ3H"
 PORT = 8000
