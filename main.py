@@ -8,10 +8,6 @@ import time
 import torch
 import uvicorn
 from dotenv import load_dotenv
-from utils.spliter import split_text 
-from utils.feat_embed import bert_feat_embed, maximun_similarity
-from utils.utils import *
-from utils.coherence_visual import speed_visulize
 from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq, pipeline
 import base64
 import cv2, glob
@@ -20,6 +16,13 @@ from statistics import mean, stdev
 import json
 from fastapi.middleware.cors import CORSMiddleware
 import librosa
+
+from ws.audio_similarity import router as ws_similarity_router
+
+from utils.spliter import split_text 
+from utils.feat_embed import bert_feat_embed, maximun_similarity
+from utils.utils import *
+from utils.coherence_visual import speed_visulize
 
 
 
@@ -50,6 +53,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(ws_similarity_router)
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
@@ -185,6 +189,9 @@ async def gpt_feedback():
 @app.post("/api/start_record")
 def create_new_record_folder():
     global id_record_section
+    global cur_idx_cluster
+    
+    cur_idx_cluster = 0
     id_record_section += 1
     audio_fpath = os.path.join(RECORD_UPLOAD_DIRECTORY, str(id_record_section))
     img_fpath = os.path.join(IMAGE_UPLOAD_DIRECTORY, str(id_record_section))
@@ -201,17 +208,13 @@ def create_new_record_folder():
 
 @app.post("/api/stt_upload")
 def upload_audio_record(
-    id: int = Form(...),
     file: UploadFile = File(...),
-    cur_idx_cluster : int = Form(...),
 ):
     print(f"🟢 Received request: ID={id}, File={file.filename}")
     
     next_idx_cluster = cur_idx_cluster + 1
     if next_idx_cluster + 1 > len(ls_cluster):
         return {
-            "id": id,
-            "filename": file.filename,
             "similarity": 0,
             "global_line_idx": -1,  # Added fallback value for end of script
             "message": "End of script!"
