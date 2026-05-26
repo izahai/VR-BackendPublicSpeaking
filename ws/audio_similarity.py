@@ -21,14 +21,6 @@ async def websocket_audio_similarity(websocket: WebSocket):
     - Raw PCM16
     - 16kHz
     - Mono
-
-    Major fixes:
-    ✅ Non-blocking inference
-    ✅ WebSocket timeout stability
-    ✅ Safe cluster bounds
-    ✅ Async disk IO
-    ✅ Reduced inference frequency
-    ✅ Prevent event-loop starvation
     """
 
     await websocket.accept()
@@ -53,11 +45,11 @@ async def websocket_audio_similarity(websocket: WebSocket):
     SAMPLE_RATE = 16000
 
     # Keep rolling 6 seconds instead of 10
-    MAX_BUFFER_SECONDS = 6
+    MAX_BUFFER_SECONDS = 10
     MAX_BUFFER_BYTES = MAX_BUFFER_SECONDS * SAMPLE_RATE * 2
 
     # Run inference every 2 seconds
-    INFERENCE_INTERVAL = 2.0
+    INFERENCE_INTERVAL = 1.0
 
     audio_buffer = bytearray()
 
