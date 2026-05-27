@@ -88,13 +88,11 @@ async def websocket_audio_similarity(websocket: WebSocket):
 
             # IMPORTANT FIX
             if next_idx_cluster + 1 >= len(ls_cluster):
-
                 # await websocket.send_json({
                 #     "similarity": 0,
                 #     "global_line_idx": -1,
                 #     "message": "End of script!"
                 # })
-
                 continue
 
             t_online_start = time.time()
