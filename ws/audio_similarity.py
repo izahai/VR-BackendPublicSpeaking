@@ -89,11 +89,11 @@ async def websocket_audio_similarity(websocket: WebSocket):
             # IMPORTANT FIX
             if next_idx_cluster + 1 >= len(ls_cluster):
 
-                await websocket.send_json({
-                    "similarity": 0,
-                    "global_line_idx": -1,
-                    "message": "End of script!"
-                })
+                # await websocket.send_json({
+                #     "similarity": 0,
+                #     "global_line_idx": -1,
+                #     "message": "End of script!"
+                # })
 
                 continue
 
@@ -202,7 +202,6 @@ async def websocket_audio_similarity(websocket: WebSocket):
                 global_line_idx = (
                     local_cur_idx_cluster * num_line_per_cluster
                 ) + cur_max_idx
-
             else:
                 global_line_idx = (
                     chosen_cluster * num_line_per_cluster
@@ -234,12 +233,13 @@ async def websocket_audio_similarity(websocket: WebSocket):
             # ==========================================================
             # SEND RESPONSE
             # ==========================================================
-            await websocket.send_json({
-                "transcription": transcription,
-                "similarity": float(max_sim),
-                "global_line_idx": global_line_idx,
-                "message": "Yes!"
-            })
+            if max_sim > 0.6:
+                await websocket.send_json({
+                    # "transcription": transcription,
+                    "similarity": float(max_sim),
+                    "global_line_idx": global_line_idx,
+                    "message": "Scrolling!"
+                })
 
     except WebSocketDisconnect:
         print("🔴 WebSocket disconnected.")

@@ -15,8 +15,8 @@ if local:
     ep = "http://127.0.0.1:8000"
     ws = "ws://127.0.0.1:8000"
 else:
-    ep = "https://01e1-34-125-16-35.ngrok-free.app"
-    ws = "wss://01e1-34-125-16-35.ngrok-free.app"
+    ep = "https://c62d-34-50-185-254.ngrok-free.app"
+    ws = "wss://c62d-34-50-185-254.ngrok-free.app"
 
 HTTP_URL = f"{ep}/api/stt_upload"
 START_RECORD_URL = f"{ep}/api/start_record"
@@ -99,7 +99,7 @@ def render_ui(latest_transcription, similarity):
     print("🎤 TELEPROMPTER TRACKING")
     print("=" * 70)
 
-    print(f"🗣️ Heard      : {latest_transcription}")
+    # print(f"🗣️ Heard      : {latest_transcription}")
     print(f"🎯 Similarity : {similarity:.4f}")
 
     print("-" * 70)
@@ -113,19 +113,30 @@ def render_ui(latest_transcription, similarity):
 
     print(f"📖 SCRIPT WINDOW (Lines {start_view} to {end_view}):\n")
 
-    target_highlight_idx = current_highlighted_idx + 2 if current_highlighted_idx != -1 else 0
-    if target_highlight_idx >= len(teleprompter_lines):
-        target_highlight_idx = len(teleprompter_lines) - 1
+    # ------------------------------------------------------
+    # MULTI-LINE HIGHLIGHT LOGIC (cur+1, cur+2, cur+3)
+    # ------------------------------------------------------
+    target_highlights = []
+    # If no line has been spoken yet, we start highlighting from the very beginning
+    base_idx = current_highlighted_idx if current_highlighted_idx != -1 else -1
+    
+    for offset in [1, 2, 3]:
+        t_idx = base_idx + offset
+        if 0 <= t_idx < len(teleprompter_lines):
+            target_highlights.append(t_idx)
 
     for idx, line in enumerate(teleprompter_lines):
         if idx < start_view or idx >= end_view:
             continue
 
-        if idx == target_highlight_idx:
+        if idx in target_highlights:
+            # Highlight upcoming next 3 lines in green
             print(f"👉 \033[1;32m[{idx:02d}] {line}\033[0m")
-        elif idx == current_highlighted_idx:
+        elif current_highlighted_idx != -1 and idx <= current_highlighted_idx:
+            # MODIFICATION: Show ALL previously completed/spoken lines muted/dimmed gray
             print(f"   \033[2m[{idx:02d}] {line} (Spoken)\033[0m")
         else:
+            # Unspoken lines outside of the upcoming green highlights
             print(f"   [{idx:02d}] {line}")
 
     print("=" * 70)
@@ -178,18 +189,25 @@ async def stream_mic_audio():
                         global_line_idx = data.get("global_line_idx", -1)
                         similarity = data.get("similarity", 0.0)
 
-                        # Update highlight rule
-                        if global_line_idx != -1 and (similarity == -1 or similarity > 0.6):
+                        # Check validation criteria
+                        is_valid_match = global_line_idx != -1 and (similarity == -1 or similarity > 0.6)
+                        
+                        # MODIFICATION: Only advance if the index is strictly greater than the previous one
+                        is_moving_forward = global_line_idx > current_highlighted_idx
+
+                        if is_valid_match and is_moving_forward:
                             current_highlighted_idx = global_line_idx
 
-                        # --------------------------------------------------
-                        # STRICT SERVER-DRIVEN SCROLL LOGIC
-                        # When the server increases cluster pointer (sim > 0.6)
-                        # We force scroll exactly 5 lines down.
-                        # --------------------------------------------------
-                        if similarity > 0.6:
-                            scroll_offset += 5
+                            # --------------------------------------------------
+                            # STRICT SERVER-DRIVEN SCROLL LOGIC
+                            # Moved inside the 'is_moving_forward' block so scrolling
+                            # only triggers when the text actually progresses.
+                            # --------------------------------------------------
+                            if similarity > 0.6:
+                                scroll_offset += 5
 
+                        # Render UI on every message to update "Heard" and "Similarity" stats 
+                        # even if the highlighted line index didn't advance.
                         render_ui(
                             latest_transcription=data.get("transcription", ""),
                             similarity=similarity

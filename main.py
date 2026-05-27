@@ -134,8 +134,7 @@ def save_metrics(section_id: int):
 @app.get("/api/stt_upload")
 def ping():
     return {
-        "format_txt" : format_txt,
-        "cur_idx_cluster" : cur_idx_cluster,
+        "teleprompter_script" : format_txt,
     }
 
 @app.get("/api/GPT_feedback")
