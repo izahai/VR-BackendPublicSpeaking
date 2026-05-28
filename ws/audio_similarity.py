@@ -88,11 +88,6 @@ async def websocket_audio_similarity(websocket: WebSocket):
 
             # IMPORTANT FIX
             if next_idx_cluster + 1 >= len(ls_cluster):
-                # await websocket.send_json({
-                #     "similarity": 0,
-                #     "global_line_idx": -1,
-                #     "message": "End of script!"
-                # })
                 continue
 
             t_online_start = time.time()
@@ -179,7 +174,6 @@ async def websocket_audio_similarity(websocket: WebSocket):
             # ==========================================================
             max_sim = 0
             global_line_idx = -1
-
             num_line_per_cluster = 5
 
             if max_sim1 >= max_sim2:
@@ -194,8 +188,9 @@ async def websocket_audio_similarity(websocket: WebSocket):
             mes = ""
             # Don't scroll if it is still currently in the current cluster
             if max_sim < cur_max_sim:
-                mes = "Highlight"
                 max_sim = cur_max_sim
+                if max_sim > 0.6:
+                    mes = "Highlight"
                 global_line_idx = (
                     local_cur_idx_cluster * num_line_per_cluster
                 ) + cur_max_idx
@@ -220,14 +215,7 @@ async def websocket_audio_similarity(websocket: WebSocket):
             # ==========================================================
             # SEND RESPONSE
             # ==========================================================
-            if mes == "Scroll":
-                await websocket.send_json({
-                    # "transcription": transcription,
-                    "similarity": float(max_sim),
-                    "global_line_idx": global_line_idx,
-                    "message": mes
-                })
-            if mes == "Highlight":
+            if mes == "Scroll" or mes == "Highlight":
                 await websocket.send_json({
                     # "transcription": transcription,
                     "similarity": float(max_sim),
