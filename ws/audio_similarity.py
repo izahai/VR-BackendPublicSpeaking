@@ -191,22 +191,20 @@ async def websocket_audio_similarity(websocket: WebSocket):
                 best_idx = max_idx2
                 chosen_cluster = next_idx_cluster + 1
 
-            # rollback detection
+            mes = ""
+            # Don't scroll if it is still currently in the current cluster
             if max_sim < cur_max_sim:
-                max_sim = 0
+                mes = "Highlight"
+                max_sim = cur_max_sim
                 global_line_idx = (
                     local_cur_idx_cluster * num_line_per_cluster
                 ) + cur_max_idx
-            else:
+            elif max_sim > 0.6:
+                mes = "Scroll"
+                main.cur_idx_cluster += 1
                 global_line_idx = (
                     chosen_cluster * num_line_per_cluster
                 ) + best_idx
-
-            # ==========================================================
-            # UPDATE GLOBAL POINTER
-            # ==========================================================
-            if max_sim > 0.6:
-                main.cur_idx_cluster += 1
 
             semantic_time = time.time() - t2
             online_time = time.time() - t_online_start
@@ -215,26 +213,28 @@ async def websocket_audio_similarity(websocket: WebSocket):
             # METRICS
             # ==========================================================
             current_metrics["asr_latency"].append(asr_time)
-            current_metrics["semantic_matching"].append(
-                semantic_time * 1000
-            )
-            current_metrics["online_alignment"].append(
-                online_time
-            )
-            current_metrics["cosine_similarity"].append(
-                float(max_sim)
-            )
+            current_metrics["semantic_matching"].append(semantic_time * 1000)
+            current_metrics["online_alignment"].append(online_time)
+            current_metrics["cosine_similarity"].append(float(max_sim))
 
             # ==========================================================
             # SEND RESPONSE
             # ==========================================================
-            if max_sim > 0.6:
+            if mes == "Scroll":
                 await websocket.send_json({
                     # "transcription": transcription,
                     "similarity": float(max_sim),
                     "global_line_idx": global_line_idx,
-                    "message": "Scrolling!"
+                    "message": mes
                 })
+            if mes == "Highlight":
+                await websocket.send_json({
+                    # "transcription": transcription,
+                    "similarity": float(max_sim),
+                    "global_line_idx": global_line_idx,
+                    "message": mes
+                })
+                
 
     except WebSocketDisconnect:
         print("🔴 WebSocket disconnected.")
