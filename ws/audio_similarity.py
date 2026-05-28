@@ -193,10 +193,7 @@ async def websocket_audio_similarity(websocket: WebSocket):
 
             # rollback detection
             if max_sim < cur_max_sim:
-                if cur_max_sim < 0.6:
-                    max_sim = 0
-                else:
-                    max_sim = -1
+                max_sim = 0
                 global_line_idx = (
                     local_cur_idx_cluster * num_line_per_cluster
                 ) + cur_max_idx
