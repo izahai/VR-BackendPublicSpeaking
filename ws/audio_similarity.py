@@ -49,11 +49,12 @@ async def websocket_audio_similarity(websocket: WebSocket):
     MAX_BUFFER_BYTES = MAX_BUFFER_SECONDS * SAMPLE_RATE * 2
 
     # Run inference every 2 seconds
-    INFERENCE_INTERVAL = 1.0
+    INFERENCE_INTERVAL = 2.0
 
     audio_buffer = bytearray()
 
     last_inference_time = 0
+    prev_line_idx = -1
 
     try:
         while True:
@@ -189,11 +190,12 @@ async def websocket_audio_similarity(websocket: WebSocket):
             # Don't scroll if it is still currently in the current cluster
             if max_sim < cur_max_sim:
                 max_sim = cur_max_sim
-                if max_sim > 0.6:
-                    mes = "Highlight"
                 global_line_idx = (
                     local_cur_idx_cluster * num_line_per_cluster
                 ) + cur_max_idx
+                if max_sim > 0.6 and global_line_idx > prev_line_idx:
+                    mes = "Highlight"
+                prev_line_idx = global_line_idx
             elif max_sim > 0.6:
                 mes = "Scroll"
                 main.cur_idx_cluster += 1
