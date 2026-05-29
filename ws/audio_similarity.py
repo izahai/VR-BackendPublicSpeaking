@@ -191,7 +191,7 @@ async def websocket_audio_similarity(websocket: WebSocket):
 
             mes = ""
             # Don't scroll if it is still currently in the current cluster
-            if cur_max_sim > 0.5:
+            if cur_max_sim > 0.6:
                 max_sim = cur_max_sim
                 global_line_idx = (
                     local_cur_idx_cluster * num_line_per_cluster
