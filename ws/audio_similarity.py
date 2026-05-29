@@ -62,9 +62,6 @@ async def websocket_audio_similarity(websocket: WebSocket):
             # RECEIVE AUDIO
             # ==========================================================
             chunk = await websocket.receive_bytes()
-            
-            print(f"📥 [Received {len(chunk)} bytes from client. "
-                  f"Current buffer size: {len(audio_buffer) + len(chunk)} bytes.")
 
             audio_buffer.extend(chunk)
 
@@ -78,6 +75,8 @@ async def websocket_audio_similarity(websocket: WebSocket):
             now = time.time()
 
             if now - last_inference_time < INFERENCE_INTERVAL:
+                print(f"📥 [Received {len(chunk)} bytes from client. "
+                    f"Current buffer size: {len(audio_buffer) + len(chunk)} bytes.")
                 continue
 
             last_inference_time = now
