@@ -222,6 +222,7 @@ async def websocket_audio_similarity(websocket: WebSocket):
             # SEND RESPONSE
             # ==========================================================
             if mes == "Scroll" or mes == "Highlight":
+                print(f"{max_sim}, {global_line_idx}, {mes}}")
                 await websocket.send_json({
                     # "transcription": transcription,
                     "similarity": float(max_sim),
