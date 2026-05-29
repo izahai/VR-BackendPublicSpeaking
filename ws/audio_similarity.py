@@ -1,6 +1,6 @@
 import asyncio
 import time
-import torch
+import wave
 import numpy as np
 import os
 
@@ -52,6 +52,7 @@ async def websocket_audio_similarity(websocket: WebSocket):
     INFERENCE_INTERVAL = 2.0
 
     audio_buffer = bytearray()
+    full_audio_record = bytearray()
 
     last_inference_time = 0
     prev_line_idx = -1
@@ -65,6 +66,7 @@ async def websocket_audio_similarity(websocket: WebSocket):
             chunk = await websocket.receive_bytes()
 
             audio_buffer.extend(chunk)
+            full_audio_record.extend(chunk)
 
             # Keep only rolling window
             if len(audio_buffer) > MAX_BUFFER_BYTES:
@@ -90,7 +92,7 @@ async def websocket_audio_similarity(websocket: WebSocket):
 
             next_idx_cluster = local_cur_idx_cluster + 1
 
-            # IMPORTANT FIX
+            # 
             if next_idx_cluster + 1 >= len(ls_cluster):
                 continue
 
@@ -238,6 +240,36 @@ async def websocket_audio_similarity(websocket: WebSocket):
 
         print(f"❌ Error in WebSocket stream: {str(e)}")
 
+        try:
+            await websocket.close()
+        except:
+            pass
+        
+    finally:
+        # ==========================================================
+        # SAVE FULL AUDIO ON CONNECTION CLOSE (WAV Format)
+        # ==========================================================
+        if len(full_audio_record) > 0:
+            try:
+                audio_path = os.path.join(
+                    TRANSCRIPTION_DIR, 
+                    f"{str(id_record_section)}.wav"
+                )
+                
+                # Define a helper function to avoid blocking the event loop
+                def save_wav_file(path, data):
+                    with wave.open(path, "wb") as wav_file:
+                        wav_file.setnchannels(1)      # Mono
+                        wav_file.setsampwidth(2)     # PCM16 (2 bytes per sample)
+                        wav_file.setframerate(16000) # 16kHz
+                        wav_file.writeframes(data)
+                
+                await asyncio.to_thread(save_wav_file, audio_path, bytes(full_audio_record))
+                print(f"💾 Full audio session saved successfully to: {audio_path}")
+            except Exception as save_err:
+                print(f"❌ Failed to save full audio stream: {str(save_err)}")
+        
+        # Clean up connection safely
         try:
             await websocket.close()
         except:
