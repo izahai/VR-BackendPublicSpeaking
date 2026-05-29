@@ -61,8 +61,8 @@ torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
 processor = AutoProcessor.from_pretrained("openai/whisper-large-v3-turbo")
 model_whisper = AutoModelForSpeechSeq2Seq.from_pretrained("openai/whisper-large-v3-turbo")
 
-# text_encoder = "BAAI/bge-large-en-v1.5"
-text_encoder = "sentence-transformers/all-mpnet-base-v2"
+text_encoder = "BAAI/bge-large-en-v1.5"
+# text_encoder = "sentence-transformers/all-mpnet-base-v2"
 model_bert = SentenceTransformer(text_encoder)
 
 model_bert.to(device)
