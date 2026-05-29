@@ -195,13 +195,14 @@ async def websocket_audio_similarity(websocket: WebSocket):
                 ) + cur_max_idx
                 if max_sim > 0.6 and global_line_idx > prev_line_idx:
                     mes = "Highlight"
-                prev_line_idx = global_line_idx
+                    prev_line_idx = global_line_idx
             elif max_sim > 0.6:
                 mes = "Scroll"
                 main.cur_idx_cluster += 1
                 global_line_idx = (
                     chosen_cluster * num_line_per_cluster
                 ) + best_idx
+                prev_line_idx = global_line_idx
 
             semantic_time = time.time() - t2
             online_time = time.time() - t_online_start
